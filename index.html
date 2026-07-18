@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#101820" />
+  <meta name="description" content="MicroCraft Showcase — a compact browser voxel survival sandbox with building, crafting, enemies, challenges, and day/night gameplay." />
+  <meta property="og:title" content="MicroCraft Showcase" />
+  <meta property="og:description" content="Mine, build, craft, survive the night, and complete challenges in a compact browser voxel world." />
+  <meta property="og:type" content="website" />
+  <title>MicroCraft Showcase</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="damage-flash" aria-hidden="true"></div>
+
+  <div id="hud" class="hidden" aria-hidden="true">
+    <div class="topbar glass">
+      <div class="brand-row">
+        <div class="brand">MICROCRAFT</div>
+        <span class="version">SHOWCASE</span>
+      </div>
+      <div class="topbar-right"><div id="stats">FPS: -- · XYZ: --</div><button id="pause-button" aria-label="Pause game">Ⅱ</button></div>
+    </div>
+
+    <aside class="quest-card glass" aria-live="polite">
+      <div class="eyebrow">CURRENT CHALLENGE</div>
+      <strong id="quest-title">Getting started</strong>
+      <div class="progress-track"><span id="quest-progress"></span></div>
+      <small id="quest-detail">Mine 0 / 10 blocks</small>
+    </aside>
+
+    <aside class="world-card glass">
+      <div><span id="time-icon">☀</span><strong id="world-clock">Day 1 · 08:00</strong></div>
+      <small id="score-label">Score 0 · Crystals 0</small>
+      <canvas id="minimap" width="150" height="150" aria-label="World minimap"></canvas>
+    </aside>
+
+    <div id="crosshair" aria-hidden="true"></div>
+    <div id="interaction-hint" aria-live="polite"></div>
+
+    <div id="player-hand" aria-hidden="true">
+      <span id="held-block"></span>
+      <span class="hand-arm"></span>
+    </div>
+
+    <div class="survival-panel">
+      <div id="hearts" class="hearts" aria-label="Health"></div>
+      <div class="stamina-row">
+        <span>SPRINT</span>
+        <div class="stamina-track"><span id="stamina-fill"></span></div>
+      </div>
+      <div id="selected-label">Grass Block</div>
+    </div>
+
+    <div id="hotbar" aria-label="Block hotbar"></div>
+
+    <div id="touch-controls" aria-hidden="true">
+      <div class="touch-move">
+        <button data-key="KeyW" aria-label="Move forward">▲</button>
+        <button data-key="KeyA" aria-label="Move left">◀</button>
+        <button data-key="KeyS" aria-label="Move backward">▼</button>
+        <button data-key="KeyD" aria-label="Move right">▶</button>
+      </div>
+      <div id="touch-look" aria-label="Swipe to look"></div>
+      <div class="touch-actions">
+        <button id="touch-jump" aria-label="Jump">JUMP</button>
+        <button id="touch-mine" aria-label="Mine">MINE</button>
+        <button id="touch-place" aria-label="Place block">PLACE</button>
+        <button id="touch-attack" aria-label="Attack">HIT</button>
+      </div>
+    </div>
+  </div>
+
+  <section id="menu" class="overlay visible">
+    <div class="panel">
+      <div class="hero-copy">
+        <div class="eyebrow">BROWSER VOXEL SURVIVAL</div>
+        <h1>MicroCraft</h1>
+        <p class="lead">Explore a procedural world, collect resources, craft new blocks, survive hostile nights, and complete challenges.</p>
+      </div>
+
+      <button id="play-button" class="primary">Enter world</button>
+
+      <div class="feature-strip">
+        <span>Procedural terrain</span><span>Day & night</span><span>Crafting</span><span>Enemies</span><span>Local saves</span>
+      </div>
+
+      <div class="controls-grid">
+        <div><kbd>W A S D</kbd><span>Move</span></div>
+        <div><kbd>Mouse</kbd><span>Look</span></div>
+        <div><kbd>Space / Shift</kbd><span>Jump / Sprint</span></div>
+        <div><kbd>Hold Left Click</kbd><span>Mine block</span></div>
+        <div><kbd>Right Click</kbd><span>Place block</span></div>
+        <div><kbd>F</kbd><span>Attack slime</span></div>
+        <div><kbd>C</kbd><span>Open crafting</span></div>
+        <div><kbd>P</kbd><span>Save screenshot</span></div>
+      </div>
+
+      <div class="menu-actions three">
+        <button id="craft-button" class="secondary">Crafting</button>
+        <button id="save-button" class="secondary">Save world</button>
+        <button id="screenshot-button" class="secondary">Screenshot</button>
+        <button id="seed-button" class="secondary">Copy seed</button>
+        <button id="quality-button" class="secondary">Quality: High</button>
+        <button id="sound-button" class="secondary">Sound: On</button>
+        <button id="share-button" class="secondary">Share game</button>
+        <button id="reset-button" class="danger wide">Generate new world</button>
+      </div>
+
+      <p id="world-info" class="world-info">Loading world…</p>
+      <p class="footnote">Desktop: click Enter World for pointer lock. Mobile: drag the right side to look and use the touch controls.</p>
+    </div>
+  </section>
+
+  <section id="craft-panel" class="overlay modal-overlay" aria-hidden="true">
+    <div class="panel modal-panel">
+      <button id="craft-close" class="icon-button" aria-label="Close crafting">×</button>
+      <div class="eyebrow">WORKBENCH</div>
+      <h2>Craft blocks</h2>
+      <p class="lead compact">Recipes consume collected resources and create new building materials.</p>
+      <div id="recipe-list" class="recipe-list"></div>
+    </div>
+  </section>
+
+  <section id="death-screen" class="overlay modal-overlay" aria-hidden="true">
+    <div class="panel death-panel">
+      <div class="eyebrow danger-text">YOU WERE DEFEATED</div>
+      <h2>Respawn?</h2>
+      <p id="death-summary" class="lead compact">Your world and inventory are safe.</p>
+      <button id="respawn-button" class="primary">Respawn at world origin</button>
+    </div>
+  </section>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="loading" class="visible"><span>Generating world</span><small>Building terrain, lighting, and creatures…</small></div>
+
+  <script>
+    window.addEventListener('error', () => {
+      const loadingMessage = document.querySelector('#loading');
+      if (loadingMessage) {
+        loadingMessage.innerHTML = '<span>Game failed to load</span><small>Check your internet connection and refresh the page.</small>';
+        loadingMessage.classList.add('visible');
+      }
+    });
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+    }
+  </script>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
