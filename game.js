@@ -1,12 +1,11 @@
 /**
  * MicroCraft — GitHub Pages safe loader
  * Loads the proven core engine, injects Three.js correctly, and adds
- * realistic water immersion + dynamic splash particles.
+ * realistic water immersion, splash particles, and underwater bubbles.
  */
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
-// Core engine snapshot that is known to run correctly
 const CORE_URL =
   'https://cdn.jsdelivr.net/gh/tagadearpit/microcraft-mini-minecraft@e8f770a4cd2a1cb806dcd131c5853f387f775877/game.js';
 
@@ -16,14 +15,12 @@ globalThis.__MICROCRAFT_PLC__ = PointerLockControls;
 function applyPatches(source) {
   let code = source;
 
-  // Strip original ES imports (we inject Three from this module)
   code = code.replace(/import\s+\*\s+as\s+THREE\s+from\s+['\"]three['\"];\s*/m, '');
   code = code.replace(
     /import\s+\{\s*PointerLockControls\s*\}\s+from\s+['\"]three\/addons\/controls\/PointerLockControls\.js['\"];\s*/m,
     ''
   );
 
-  // Always declare water state early so movement never references undeclared vars
   code = code.replace(
     'let lastWorldTime = worldTime;',
     `let lastWorldTime = worldTime;
@@ -31,9 +28,12 @@ let isUnderwater = false;
 let wasInWater = false;
 let waterRippleTime = 0;
 const splashParticles = [];
+const bubbleParticles = [];
 let underwaterOverlay = null;
 let waterBase = null;
+let bubbleSpawnTimer = 0;
 const splashGeometry = new THREE.SphereGeometry(0.055, 6, 6);
+const bubbleGeometry = new THREE.SphereGeometry(1, 8, 8);
 
 function ensureUnderwaterOverlay() {
   if (underwaterOverlay) return underwaterOverlay;
@@ -78,6 +78,40 @@ function spawnSplash(x, y, z, intensity = 1) {
   try { playTone(210 + Math.random() * 50, 0.04, 0.018, 'sine'); } catch (e) {}
 }
 
+function spawnBubble(x, y, z, sizeScale = 1) {
+  const radius = (0.04 + Math.random() * 0.09) * sizeScale;
+  const mat = new THREE.MeshPhongMaterial({
+    color: 0xd8f6ff,
+    transparent: true,
+    opacity: 0.45 + Math.random() * 0.25,
+    shininess: 120,
+    specular: 0xffffff,
+    depthWrite: false
+  });
+  const mesh = new THREE.Mesh(bubbleGeometry, mat);
+  mesh.scale.setScalar(radius);
+  mesh.position.set(
+    x + (Math.random() - 0.5) * 0.35,
+    y,
+    z + (Math.random() - 0.5) * 0.35
+  );
+  mesh.renderOrder = 3;
+  scene.add(mesh);
+  bubbleParticles.push({
+    mesh,
+    velocity: new THREE.Vector3(
+      (Math.random() - 0.5) * 0.25,
+      0.55 + Math.random() * 0.85,
+      (Math.random() - 0.5) * 0.25
+    ),
+    wobble: Math.random() * Math.PI * 2,
+    wobbleSpeed: 2.2 + Math.random() * 2.5,
+    life: 1.4 + Math.random() * 1.8,
+    maxLife: 3.2,
+    baseScale: radius
+  });
+}
+
 function updateSplashParticles(delta) {
   for (let i = splashParticles.length - 1; i >= 0; i -= 1) {
     const p = splashParticles[i];
@@ -93,10 +127,65 @@ function updateSplashParticles(delta) {
       splashParticles.splice(i, 1);
     }
   }
+}
+
+function updateBubbleParticles(delta) {
+  // Spawn rising bubbles while fully underwater
+  if (isUnderwater) {
+    bubbleSpawnTimer -= delta;
+    if (bubbleSpawnTimer <= 0) {
+      bubbleSpawnTimer = qualityHigh ? (0.12 + Math.random() * 0.18) : (0.22 + Math.random() * 0.28);
+      const feetY = camera.position.y - EYE_HEIGHT;
+      // Near player (breath / movement bubbles)
+      spawnBubble(
+        camera.position.x + (Math.random() - 0.5) * 1.2,
+        feetY + 0.2 + Math.random() * 0.6,
+        camera.position.z + (Math.random() - 0.5) * 1.2,
+        0.8 + Math.random() * 0.6
+      );
+      // Occasional ambient bubble farther away
+      if (Math.random() < 0.35) {
+        spawnBubble(
+          camera.position.x + (Math.random() - 0.5) * 5,
+          Math.min(SEA_LEVEL - 0.3, feetY + Math.random() * 1.5),
+          camera.position.z + (Math.random() - 0.5) * 5,
+          0.5 + Math.random() * 1.1
+        );
+      }
+    }
+  } else {
+    bubbleSpawnTimer = 0;
+  }
+
+  for (let i = bubbleParticles.length - 1; i >= 0; i -= 1) {
+    const b = bubbleParticles[i];
+    b.life -= delta;
+    b.wobble += b.wobbleSpeed * delta;
+    b.mesh.position.x += Math.sin(b.wobble) * 0.35 * delta + b.velocity.x * delta;
+    b.mesh.position.z += Math.cos(b.wobble * 0.85) * 0.28 * delta + b.velocity.z * delta;
+    b.mesh.position.y += b.velocity.y * delta;
+
+    // Slight size pulse
+    const pulse = 1 + Math.sin(b.wobble * 1.4) * 0.08;
+    b.mesh.scale.setScalar(b.baseScale * pulse);
+
+    const t = Math.max(0, b.life / (b.maxLife || 3));
+    b.mesh.material.opacity = Math.min(0.7, 0.25 + t * 0.45);
+
+    // Pop at water surface or end of life
+    if (b.mesh.position.y >= SEA_LEVEL + 0.35 || b.life <= 0) {
+      // Tiny pop flash at surface
+      if (b.mesh.position.y >= SEA_LEVEL + 0.2) {
+        spawnSplash(b.mesh.position.x, SEA_LEVEL + 0.45, b.mesh.position.z, 0.18);
+      }
+      scene.remove(b.mesh);
+      b.mesh.material.dispose();
+      bubbleParticles.splice(i, 1);
+    }
+  }
 }`
   );
 
-  // Better water surface (keep variable name waterMaterial / water)
   code = code.replace(
     'const waterMaterial = new THREE.MeshPhongMaterial({ color: 0x3b9ee8, transparent: true, opacity: 0.46, shininess: 90, depthWrite: false });\nconst water = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_RADIUS * 2 + 1.5, WORLD_RADIUS * 2 + 1.5), waterMaterial);\nwater.rotation.x = -Math.PI / 2;\nwater.position.y = SEA_LEVEL + 0.46;\nwater.renderOrder = 2;\nscene.add(water);',
     `const waterGeometry = new THREE.PlaneGeometry(WORLD_RADIUS * 2 + 2, WORLD_RADIUS * 2 + 2, 40, 40);
@@ -120,7 +209,6 @@ waterBase.set(water.geometry.attributes.position.array);
 ensureUnderwaterOverlay();`
   );
 
-  // Movement: buoyancy + splash on enter (keep WASD intact)
   code = code.replace(
     '  const inWater = camera.position.y - EYE_HEIGHT < SEA_LEVEL + 0.65;\n  const speed = (sprinting ? SPRINT_SPEED : WALK_SPEED) * (inWater ? 0.62 : 1);\n  velocity.x = movement.x * speed;\n  velocity.z = movement.z * speed;\n  velocity.y -= GRAVITY * delta;',
     `  const feetY = camera.position.y - EYE_HEIGHT;
@@ -135,6 +223,10 @@ ensureUnderwaterOverlay();`
   }
   if (inWater && movement.lengthSq() > 0.12 && Math.random() < delta * 5) {
     spawnSplash(camera.position.x, SEA_LEVEL + 0.48, camera.position.z, 0.3);
+  }
+  // Extra bubbles when swimming hard underwater
+  if (fullySubmerged && movement.lengthSq() > 0.2 && Math.random() < delta * 8) {
+    spawnBubble(camera.position.x, feetY + 0.4, camera.position.z, 0.7 + Math.random() * 0.5);
   }
   wasInWater = inWater;
 
@@ -156,13 +248,11 @@ ensureUnderwaterOverlay();`
   velocity.y -= GRAVITY * gravityMul * delta;`
   );
 
-  // Swim jump + splash
   code = code.replace(
     "  if (event.code === 'Space' && !event.repeat && gameActive() && grounded) {\n    velocity.y = JUMP_SPEED;",
-    "  if (event.code === 'Space' && !event.repeat && gameActive() && (grounded || isUnderwater || (camera.position.y - EYE_HEIGHT < SEA_LEVEL + 0.55))) {\n    velocity.y = isUnderwater ? JUMP_SPEED * 0.72 : JUMP_SPEED;\n    if (!grounded) spawnSplash(camera.position.x, Math.min(camera.position.y, SEA_LEVEL + 0.5), camera.position.z, 0.5);"
+    "  if (event.code === 'Space' && !event.repeat && gameActive() && (grounded || isUnderwater || (camera.position.y - EYE_HEIGHT < SEA_LEVEL + 0.55))) {\n    velocity.y = isUnderwater ? JUMP_SPEED * 0.72 : JUMP_SPEED;\n    if (!grounded) {\n      spawnSplash(camera.position.x, Math.min(camera.position.y, SEA_LEVEL + 0.5), camera.position.z, 0.5);\n      if (isUnderwater) {\n        for (let bi = 0; bi < 4; bi += 1) spawnBubble(camera.position.x, camera.position.y - 0.4, camera.position.z, 0.6 + Math.random() * 0.5);\n      }\n    }"
   );
 
-  // Underwater look + water color
   code = code.replace(
     '  waterMaterial.color.setHex(daylight > 0.25 ? 0x3b9ee8 : 0x183f72);\n\n  const totalMinutes = Math.floor(worldTime * 24 * 60);',
     `  if (daylight > 0.35) waterMaterial.color.setHex(0x1a7ab8);
@@ -188,7 +278,6 @@ ensureUnderwaterOverlay();`
   const totalMinutes = Math.floor(worldTime * 24 * 60);`
   );
 
-  // Waves + opacity shimmer
   code = code.replace(
     'function updateClouds(delta) {\n  for (const cloud of clouds.children) {\n    cloud.position.x += cloud.userData.speed * delta;\n    if (cloud.position.x > 42) cloud.position.x = -42;\n  }\n  waterMaterial.opacity = 0.43 + Math.sin(performance.now() * 0.0018) * 0.035;\n}',
     `function updateClouds(delta) {
@@ -214,13 +303,11 @@ ensureUnderwaterOverlay();`
 }`
   );
 
-  // Animate splash particles each frame
   code = code.replace(
     '  updateParticles(delta);\n  updateBlockAnimations(delta);\n  updateClouds(delta);',
-    '  updateParticles(delta);\n  updateSplashParticles(delta);\n  updateBlockAnimations(delta);\n  updateClouds(delta);'
+    '  updateParticles(delta);\n  updateSplashParticles(delta);\n  updateBubbleParticles(delta);\n  updateBlockAnimations(delta);\n  updateClouds(delta);'
   );
 
-  // Soft sky
   code = code.replace(
     'const nightColor = new THREE.Color(0x071321);\n  const dayColor = new THREE.Color(0x82c7f2);\n  const duskColor = new THREE.Color(0xe58b68);',
     'const nightColor = new THREE.Color(0x060e1a);\n  const dayColor = new THREE.Color(0x7eb8e8);\n  const duskColor = new THREE.Color(0xd4784a);'
