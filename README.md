@@ -2,6 +2,13 @@
 
 A compact browser-based voxel survival game built with HTML, CSS, JavaScript, and Three.js. Designed to run from VS Code Live Server and deploy directly to GitHub Pages, Vercel, or Netlify.
 
+## Tech stack
+
+- HTML5 / CSS3 / Vanilla JavaScript
+- Three.js (via CDN import map)
+- Service Worker + Web App Manifest (PWA)
+- LocalStorage for world persistence
+
 ## Gameplay features
 
 - Procedural voxel terrain with grass, dirt, stone, sand, trees, water, and crystal ore
