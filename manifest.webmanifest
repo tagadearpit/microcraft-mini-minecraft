@@ -1,12 +1,12 @@
 {
-  "name": "MicroCraft Showcase",
+  "name": "MicroCraft — Mini Minecraft Showcase",
   "short_name": "MicroCraft",
-  "description": "A compact browser voxel survival sandbox.",
+  "description": "A compact browser voxel survival sandbox with mining, crafting, enemies, and day/night cycles.",
   "start_url": "./",
   "display": "fullscreen",
   "background_color": "#101820",
   "theme_color": "#101820",
-  "orientation": "landscape",
+  "orientation": "any",
   "icons": [
     {
       "src": "icon.svg",
