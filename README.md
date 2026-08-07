@@ -44,6 +44,12 @@ A compact browser-based voxel survival game built with HTML, CSS, JavaScript, an
 | R | Respawn |
 | Esc | Pause |
 
+## Mobile controls
+
+- Drag the right side of the screen to look around
+- Use the on-screen D-pad to move
+- Use JUMP / MINE / PLACE / HIT action buttons
+
 ## Deploy to GitHub Pages
 
 1. Create a new GitHub repository.
