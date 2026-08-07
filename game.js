@@ -68,7 +68,7 @@ const SPRINT_SPEED = 6.6;
 const JUMP_SPEED = 7.6;
 const REACH = 6.2;
 const DAY_LENGTH_SECONDS = 600;
-const SAVE_KEY = 'microcraft_save_v2';
+const SAVE_KEY = 'microcraft_save_v3';
 
 const BLOCKS = {
   grass: { id: 'grass', name: 'Grass Block', color: 0x6ea83d, rough: 0.95, metal: 0.0, mineTime: 0.5 },
@@ -213,7 +213,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.22;
 gameRoot.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -230,10 +230,13 @@ window.addEventListener('resize', () => {
 });
 
 /* ---- Lighting ---- */
-const hemiLight = new THREE.HemisphereLight(0x9ec8ff, 0x50412c, 0.8);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.42);
+scene.add(ambientLight);
+
+const hemiLight = new THREE.HemisphereLight(0x9ec8ff, 0x50412c, 1.15);
 scene.add(hemiLight);
 
-const sun = new THREE.DirectionalLight(0xfff2d8, 1.4);
+const sun = new THREE.DirectionalLight(0xfff2d8, 2.15);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1536, 1536);
 sun.shadow.camera.near = 1;
@@ -246,7 +249,7 @@ sun.shadow.bias = -0.0018;
 scene.add(sun);
 scene.add(sun.target);
 
-const moonLight = new THREE.DirectionalLight(0x9fb7ff, 0.0);
+const moonLight = new THREE.DirectionalLight(0x9fb7ff, 0.08);
 scene.add(moonLight);
 scene.add(moonLight.target);
 
@@ -290,8 +293,8 @@ const skyMat = new THREE.ShaderMaterial({
 const skyDome = new THREE.Mesh(skyGeo, skyMat);
 scene.add(skyDome);
 
-scene.fog = new THREE.Fog(0xbfe0f5, 24, 68);
-let surfaceFogNear = 24, surfaceFogFar = 68;
+scene.fog = new THREE.Fog(0xbfe0f5, 32, 96);
+let surfaceFogNear = 32, surfaceFogFar = 96;
 
 /* ---- Sun / moon glow sprites ---- */
 function makeGlowTexture(inner, outer) {
@@ -547,7 +550,8 @@ class InstancedBlockLayer {
       map: buildBlockTexture(type),
       roughness: def.rough,
       metalness: def.metal,
-      vertexColors: true
+      vertexColors: true,
+      envMapIntensity: 0.45
     });
     if (def.emissive) {
       mat.emissive = new THREE.Color(def.emissive);
@@ -943,7 +947,7 @@ function updateUnderwaterFog(delta, daylight) {
     skyMat.uniforms.sunVisibility.value = 0;
     const lightMul = 1 - underwaterFogBlend * 0.72;
     hemiLight.intensity = (0.2 + daylight * 1.1) * lightMul;
-    sun.intensity = (0.1 + daylight * 1.6) * (1 - underwaterFogBlend * 0.8);
+    sun.intensity = (0.25 + daylight * 2.05) * (1 - underwaterFogBlend * 0.72);
     overlay.style.opacity = String(0.35 + underwaterFogBlend * 0.65);
     overlay.classList.add('active');
   } else {
@@ -1706,21 +1710,22 @@ function updateDayNight(delta) {
   sun.position.copy(camera.position).addScaledVector(sunDir, 120);
   sun.target.position.copy(camera.position);
   sun.target.updateMatrixWorld();
-  sun.intensity = 0.15 + daylight * 1.5;
+  sun.intensity = 0.35 + daylight * 2.15;
   sun.color.setHSL(0.11 - daylight * 0.02, 0.55, 0.55 + daylight * 0.25);
 
   const moonDir = sunDir.clone().negate();
   moonLight.position.copy(camera.position).addScaledVector(moonDir, 120);
   moonLight.target.position.copy(camera.position);
   moonLight.target.updateMatrixWorld();
-  moonLight.intensity = nightAmt * 0.35;
+  moonLight.intensity = nightAmt * 0.48;
 
   sunSprite.position.copy(camera.position).addScaledVector(sunDir, 260);
   sunSprite.material.opacity = Math.max(0, sunDir.y + 0.1);
   moonSprite.position.copy(camera.position).addScaledVector(moonDir, 260);
   moonSprite.material.opacity = Math.max(0, -sunDir.y + 0.1);
 
-  hemiLight.intensity = 0.25 + daylight * 0.75;
+  hemiLight.intensity = 0.55 + daylight * 0.65;
+  ambientLight.intensity = 0.18 + daylight * 0.34;
   hemiLight.color.setHSL(0.58, 0.5, 0.55 + daylight * 0.25);
 
   const dayTop = new THREE.Color(0x2f6fb8), dayBottom = new THREE.Color(0xbfe0f5);
