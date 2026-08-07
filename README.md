@@ -9,6 +9,15 @@ A compact browser-based voxel survival game built with HTML, CSS, JavaScript, an
 - Service Worker + Web App Manifest (PWA)
 - LocalStorage for world persistence
 
+## Realism upgrades
+
+- **Animated water surface** with multi-wave ripple motion
+- **Underwater immersion** — teal fog, muted lighting, and a caustic screen overlay when fully submerged
+- **Buoyancy & resistance** — slower movement, reduced gravity, and swim-jump while in water
+- **Day/night water colors** that shift from bright teal to deep night blue
+- **Standard materials** on blocks for more natural lighting response
+- **Atmospheric fog and sky** tuned for a more realistic outdoor feel
+
 ## Gameplay features
 
 - Procedural voxel terrain with grass, dirt, stone, sand, trees, water, and crystal ore
@@ -17,7 +26,7 @@ A compact browser-based voxel survival game built with HTML, CSS, JavaScript, an
 - Crafting recipes for wood planks, stone bricks, and glowing blocks
 - Day/night cycle with moving sun and moon, stars, fog, changing sky colors, and hostile night slimes
 - Slime combat, health, fall damage, death, and respawning
-- Sprint stamina and water movement slowdown
+- Sprint stamina and realistic water movement
 - Five sequential challenges, score tracking, crystals, and local progress saving
 - Live minimap with nearby enemy markers
 - Screenshot export, world-seed copying, quality mode, and sound toggle
@@ -40,7 +49,7 @@ A compact browser-based voxel survival game built with HTML, CSS, JavaScript, an
 |---|---|
 | W A S D | Move |
 | Mouse | Look |
-| Space | Jump |
+| Space | Jump / swim up |
 | Shift | Sprint |
 | Hold left click | Mine block |
 | Right click | Place selected block |
@@ -93,8 +102,8 @@ Drag this entire folder into Netlify Drop, or connect the GitHub repository. The
 ## Main files
 
 - `index.html` — UI, menus, HUD, metadata
-- `style.css` — responsive UI and animations
-- `game.js` — renderer, terrain, physics, mobs, crafting, persistence
+- `style.css` — responsive UI, animations, underwater overlay
+- `game.js` — engine bootstrap + realistic water immersion patches
 - `manifest.webmanifest` — installable app metadata
 - `sw.js` — local asset caching
 - `vercel.json` / `netlify.toml` — static-host configuration
