@@ -9,8 +9,6 @@ import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
 // ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
 const CORE_URL =
   'https://cdn.jsdelivr.net/gh/tagadearpit/microcraft-mini-minecraft@e8f770a4cd2a1cb806dcd131c5853f387f775877/game.js';
 
