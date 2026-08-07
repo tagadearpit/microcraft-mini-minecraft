@@ -7,6 +7,7 @@
   "background_color": "#101820",
   "theme_color": "#101820",
   "orientation": "any",
+  "categories": ["games", "entertainment"],
   "icons": [
     {
       "src": "icon.svg",
