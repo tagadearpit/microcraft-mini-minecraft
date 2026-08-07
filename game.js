@@ -1,7 +1,6 @@
 /**
  * MicroCraft — GitHub Pages safe loader
- * Loads the proven core engine, injects Three.js correctly, and adds
- * realistic water immersion, splash particles, and underwater bubbles.
+ * Core engine + water immersion, splash, bubbles, depth-based underwater fog.
  */
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
@@ -32,6 +31,9 @@ const bubbleParticles = [];
 let underwaterOverlay = null;
 let waterBase = null;
 let bubbleSpawnTimer = 0;
+let underwaterFogBlend = 0;
+let surfaceFogNear = 22;
+let surfaceFogFar = 62;
 const splashGeometry = new THREE.SphereGeometry(0.055, 6, 6);
 const bubbleGeometry = new THREE.SphereGeometry(1, 8, 8);
 
@@ -130,20 +132,17 @@ function updateSplashParticles(delta) {
 }
 
 function updateBubbleParticles(delta) {
-  // Spawn rising bubbles while fully underwater
   if (isUnderwater) {
     bubbleSpawnTimer -= delta;
     if (bubbleSpawnTimer <= 0) {
       bubbleSpawnTimer = qualityHigh ? (0.12 + Math.random() * 0.18) : (0.22 + Math.random() * 0.28);
       const feetY = camera.position.y - EYE_HEIGHT;
-      // Near player (breath / movement bubbles)
       spawnBubble(
         camera.position.x + (Math.random() - 0.5) * 1.2,
         feetY + 0.2 + Math.random() * 0.6,
         camera.position.z + (Math.random() - 0.5) * 1.2,
         0.8 + Math.random() * 0.6
       );
-      // Occasional ambient bubble farther away
       if (Math.random() < 0.35) {
         spawnBubble(
           camera.position.x + (Math.random() - 0.5) * 5,
@@ -164,17 +163,11 @@ function updateBubbleParticles(delta) {
     b.mesh.position.x += Math.sin(b.wobble) * 0.35 * delta + b.velocity.x * delta;
     b.mesh.position.z += Math.cos(b.wobble * 0.85) * 0.28 * delta + b.velocity.z * delta;
     b.mesh.position.y += b.velocity.y * delta;
-
-    // Slight size pulse
     const pulse = 1 + Math.sin(b.wobble * 1.4) * 0.08;
     b.mesh.scale.setScalar(b.baseScale * pulse);
-
     const t = Math.max(0, b.life / (b.maxLife || 3));
     b.mesh.material.opacity = Math.min(0.7, 0.25 + t * 0.45);
-
-    // Pop at water surface or end of life
     if (b.mesh.position.y >= SEA_LEVEL + 0.35 || b.life <= 0) {
-      // Tiny pop flash at surface
       if (b.mesh.position.y >= SEA_LEVEL + 0.2) {
         spawnSplash(b.mesh.position.x, SEA_LEVEL + 0.45, b.mesh.position.z, 0.18);
       }
@@ -182,6 +175,64 @@ function updateBubbleParticles(delta) {
       b.mesh.material.dispose();
       bubbleParticles.splice(i, 1);
     }
+  }
+}
+
+/** Depth-based underwater fog — denser and darker the deeper you go */
+function updateUnderwaterFog(delta, daylight) {
+  const eyeY = camera.position.y;
+  const surfaceY = SEA_LEVEL + 0.35;
+  const depthBelow = Math.max(0, surfaceY - eyeY);
+  const targetBlend = depthBelow > 0 ? Math.min(1, 0.35 + depthBelow / 2.2) : 0;
+
+  // Smooth enter / exit so fog does not pop
+  const lerpSpeed = targetBlend > underwaterFogBlend ? 5.5 : 3.2;
+  underwaterFogBlend += (targetBlend - underwaterFogBlend) * Math.min(1, delta * lerpSpeed);
+  if (underwaterFogBlend < 0.001) underwaterFogBlend = 0;
+
+  const overlay = ensureUnderwaterOverlay();
+
+  if (underwaterFogBlend > 0) {
+    // Shallow teal → deep navy with depth
+    const shallow = new THREE.Color(0x1a6b7e);
+    const mid = new THREE.Color(0x0c4558);
+    const deep = new THREE.Color(0x031820);
+    const fogColor = shallow.clone().lerp(mid, Math.min(1, underwaterFogBlend * 1.2));
+    fogColor.lerp(deep, Math.max(0, underwaterFogBlend - 0.45) / 0.55);
+
+    // Night makes underwater even darker
+    if (daylight < 0.35) {
+      fogColor.lerp(new THREE.Color(0x01080e), (0.35 - daylight) / 0.35 * 0.45);
+    }
+
+    // Visibility shrinks with depth (near/far in world units)
+    const near = 0.4 + (1 - underwaterFogBlend) * 2.8;
+    const far = 5.5 + (1 - underwaterFogBlend) * 14;
+
+    if (!scene.fog || scene.fog.isFogExp2) {
+      scene.fog = new THREE.Fog(fogColor.getHex(), near, far);
+    } else {
+      scene.fog.color.copy(fogColor);
+      scene.fog.near = near;
+      scene.fog.far = far;
+    }
+    scene.background.copy(fogColor);
+
+    // Dim lights with depth
+    const lightMul = 1 - underwaterFogBlend * 0.72;
+    hemiLight.intensity = (0.22 + daylight * 1.35) * lightMul;
+    sun.intensity = (0.12 + daylight * 2.25) * (1 - underwaterFogBlend * 0.8);
+
+    overlay.style.opacity = String(0.35 + underwaterFogBlend * 0.65);
+    overlay.classList.add('active');
+  } else {
+    // Restore surface fog ranges; color is set by day/night cycle
+    if (scene.fog && !scene.fog.isFogExp2) {
+      scene.fog.near = surfaceFogNear;
+      scene.fog.far = surfaceFogFar;
+    }
+    overlay.style.opacity = '';
+    overlay.classList.remove('active');
   }
 }`
   );
@@ -224,7 +275,6 @@ ensureUnderwaterOverlay();`
   if (inWater && movement.lengthSq() > 0.12 && Math.random() < delta * 5) {
     spawnSplash(camera.position.x, SEA_LEVEL + 0.48, camera.position.z, 0.3);
   }
-  // Extra bubbles when swimming hard underwater
   if (fullySubmerged && movement.lengthSq() > 0.2 && Math.random() < delta * 8) {
     spawnBubble(camera.position.x, feetY + 0.4, camera.position.z, 0.7 + Math.random() * 0.5);
   }
@@ -253,27 +303,15 @@ ensureUnderwaterOverlay();`
     "  if (event.code === 'Space' && !event.repeat && gameActive() && (grounded || isUnderwater || (camera.position.y - EYE_HEIGHT < SEA_LEVEL + 0.55))) {\n    velocity.y = isUnderwater ? JUMP_SPEED * 0.72 : JUMP_SPEED;\n    if (!grounded) {\n      spawnSplash(camera.position.x, Math.min(camera.position.y, SEA_LEVEL + 0.5), camera.position.z, 0.5);\n      if (isUnderwater) {\n        for (let bi = 0; bi < 4; bi += 1) spawnBubble(camera.position.x, camera.position.y - 0.4, camera.position.z, 0.6 + Math.random() * 0.5);\n      }\n    }"
   );
 
+  // Day/night water color + call depth fog after sky is updated
   code = code.replace(
     '  waterMaterial.color.setHex(daylight > 0.25 ? 0x3b9ee8 : 0x183f72);\n\n  const totalMinutes = Math.floor(worldTime * 24 * 60);',
     `  if (daylight > 0.35) waterMaterial.color.setHex(0x1a7ab8);
   else if (daylight > 0.12) waterMaterial.color.setHex(0x2a5f8a);
   else waterMaterial.color.setHex(0x0c2a48);
 
-  const overlay = ensureUnderwaterOverlay();
-  if (isUnderwater) {
-    const deep = new THREE.Color(0x0a3a52);
-    scene.background.copy(deep);
-    scene.fog.color.copy(deep);
-    scene.fog.near = 2;
-    scene.fog.far = 14;
-    hemiLight.intensity = 0.35;
-    sun.intensity *= 0.35;
-    overlay.classList.add('active');
-  } else {
-    scene.fog.near = 22;
-    scene.fog.far = 62;
-    overlay.classList.remove('active');
-  }
+  // Apply depth-based underwater fog (overrides surface fog while submerged)
+  updateUnderwaterFog(delta, daylight);
 
   const totalMinutes = Math.floor(worldTime * 24 * 60);`
   );
