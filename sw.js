@@ -17,6 +17,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  // Clean up old cache versions
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
@@ -38,11 +39,13 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(event.request)
         .then((response) => {
+          // Cache successful responses for offline use
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
           return response;
         })
         .catch(() => {
+          // Offline fallback for navigation requests
           if (event.request.mode === 'navigate') {
             return caches.match('./index.html');
           }
