@@ -1,5 +1,5 @@
 // MicroCraft service worker — caches core assets for offline repeat visits
-const CACHE_NAME = 'microcraft-showcase-v4';
+const CACHE_NAME = 'microcraft-showcase-v5';
 const LOCAL_ASSETS = [
   './',
   './index.html',
