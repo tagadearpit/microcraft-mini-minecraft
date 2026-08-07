@@ -69,7 +69,7 @@ button { cursor: pointer; }
 
 #hotbar { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); display:flex; gap:6px; padding:7px; border:1px solid rgba(255,255,255,.2); border-radius:14px; background:rgba(8,12,19,.7); backdrop-filter:blur(12px); }
 .hotbar-slot { position:relative; width:48px; height:48px; display:grid; place-items:center; border:2px solid rgba(255,255,255,.17); border-radius:9px; background:rgba(255,255,255,.07); transition:transform .14s ease,border-color .14s ease,background .14s ease; }
-.hotbar-slot.selected { transform:translateY(-5px); border-color:#fff; background:rgba(255,255,255,.19); }
+.hotbar-slot.selected { transform:translateY(-6px); border-color:#fff; background:rgba(255,255,255,.22); box-shadow: 0 4px 12px rgba(0,0,0,.25); }
 .hotbar-slot.empty { opacity:.42; filter:grayscale(.7); }
 .block-swatch { width:26px; height:26px; border:2px solid rgba(0,0,0,.25); box-shadow:inset 0 0 0 2px rgba(255,255,255,.12),0 4px 8px rgba(0,0,0,.25); }
 .slot-number { position:absolute; top:3px; left:5px; font-size:9px; color:rgba(255,255,255,.8); }
@@ -95,6 +95,7 @@ h2 { margin:8px 0 10px; font-size:clamp(30px,5vw,46px); letter-spacing:-.035em; 
 button { border:0; border-radius:11px; padding:12px 15px; font-weight:850; transition:transform .14s ease,filter .14s ease,background .14s ease; }
 button:hover { transform:translateY(-1px); filter:brightness(1.07); }
 button:active { transform:translateY(0); }
+button:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 .primary { width:100%; background:var(--accent); color:#11230b; font-size:15px; }
 .secondary { color:var(--text); background:rgba(255,255,255,.09); border:1px solid var(--line); }
 .danger { color:#ffdede; background:rgba(255,105,105,.12); border:1px solid rgba(255,105,105,.28); }
