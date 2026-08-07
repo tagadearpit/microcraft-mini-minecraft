@@ -1,6 +1,6 @@
-# MicroCraft Showcase
+# MicroCraft — Mini Minecraft Showcase
 
-A compact browser-based voxel survival game built with HTML, CSS, JavaScript, and Three.js. It is designed to run from VS Code Live Server and deploy directly to GitHub Pages, Vercel, or Netlify.
+A compact browser-based voxel survival game built with HTML, CSS, JavaScript, and Three.js. Designed to run from VS Code Live Server and deploy directly to GitHub Pages, Vercel, or Netlify.
 
 ## Gameplay features
 
@@ -20,7 +20,7 @@ A compact browser-based voxel survival game built with HTML, CSS, JavaScript, an
 ## Run locally
 
 1. Extract the ZIP.
-2. Open the `microcraft-showcase-v3` folder in VS Code.
+2. Open the project folder in VS Code.
 3. Install the **Live Server** extension.
 4. Right-click `index.html`.
 5. Select **Open with Live Server**.
