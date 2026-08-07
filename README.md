@@ -19,14 +19,13 @@ A compact browser-based voxel survival game built with HTML, CSS, JavaScript, an
 
 ## Run locally
 
-1. Extract the ZIP.
-2. Open the project folder in VS Code.
-3. Install the **Live Server** extension.
-4. Right-click `index.html`.
-5. Select **Open with Live Server**.
-6. Click **Enter world**.
+1. Open the project folder in VS Code.
+2. Install the **Live Server** extension.
+3. Right-click `index.html`.
+4. Select **Open with Live Server**.
+5. Click **Enter world**.
 
-Opening `index.html` directly with a `file://` URL is not recommended because browser module and service-worker security rules require a local HTTP server.
+> Tip: Opening `index.html` directly with a `file://` URL is not recommended because browser module and service-worker security rules require a local HTTP server.
 
 ## Desktop controls
 
