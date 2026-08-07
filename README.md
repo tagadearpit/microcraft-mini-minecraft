@@ -81,7 +81,7 @@ Drag this entire folder into Netlify Drop, or connect the GitHub repository. The
 - There is no account system, backend, analytics, or multiplayer server.
 - Clearing browser site data removes the saved world.
 - Three.js is loaded from jsDelivr, so the first visit requires internet access.
-- This is an original learning project and does not use Minecraft code, textures, branding assets, or proprietary game data.
+- This is an **original learning project** and does not use Minecraft code, textures, branding assets, or proprietary game data.
 
 ## Main files
 
