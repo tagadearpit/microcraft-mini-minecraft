@@ -6,7 +6,7 @@
   "display": "fullscreen",
   "background_color": "#101820",
   "theme_color": "#101820",
-  "orientation": "any",
+  "orientation": "landscape",
   "categories": ["games", "entertainment"],
   "icons": [
     {

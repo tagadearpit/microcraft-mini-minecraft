@@ -38,4 +38,11 @@ The game engine no longer downloads a separate MicroCraft engine file at runtime
 - Right click — place
 - `F` — attack
 - `C` — crafting
+
+### Mobile / touch (installed app)
+
+- Left thumb: analog joystick to move
+- Right side: drag to look (sensitivity adjustable in the menu)
+- Bottom-right icon buttons: place, mine, attack, jump
+- When installed to the home screen from Chrome, the app automatically locks to landscape orientation. In a regular browser tab it behaves as before.
 - `P` — screenshot

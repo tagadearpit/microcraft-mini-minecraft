@@ -129,16 +129,33 @@ kbd { color:var(--text); font-size:10px; font-weight:900; }
 #loading small { color:#9da9ba; }
 
 #touch-controls { display:none; }
+.mobile-settings { display:none; }
 @media (pointer:coarse), (max-width:800px) {
   #touch-controls { display:block; position:absolute; inset:0; pointer-events:none; }
   #pause-button { display:block; }
   #hotbar { pointer-events:auto; }
+  .mobile-settings { display:block; margin:14px 0 0; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.045); }
+  .sensitivity-row { display:flex; align-items:center; gap:10px; margin-top:8px; font-size:12px; color:var(--muted); }
+  .sensitivity-row input[type="range"] { flex:1; accent-color:var(--accent); }
+  #sensitivity-value { min-width:16px; text-align:right; color:var(--text); font-weight:800; }
   #touch-look { position:absolute; right:0; top:0; width:58%; height:72%; pointer-events:auto; touch-action:none; }
-  .touch-move { position:absolute; left:18px; bottom:34px; width:128px; height:128px; pointer-events:auto; }
-  .touch-move button { position:absolute; width:45px; height:45px; padding:0; border-radius:14px; color:#fff; background:rgba(8,12,20,.62); border:1px solid rgba(255,255,255,.2); }
-  .touch-move button:nth-child(1){left:41px;top:0}.touch-move button:nth-child(2){left:0;top:42px}.touch-move button:nth-child(3){left:41px;top:82px}.touch-move button:nth-child(4){left:82px;top:42px}
-  .touch-actions { position:absolute; right:14px; bottom:20px; display:grid; grid-template-columns:repeat(2,64px); gap:7px; pointer-events:auto; }
-  .touch-actions button { height:48px; padding:0; color:#fff; background:rgba(8,12,20,.66); border:1px solid rgba(255,255,255,.2); font-size:9px; }
+
+  /* Analog movement joystick (mobile only) */
+  .touch-move { position:absolute; left:14px; bottom:18px; width:140px; height:140px; pointer-events:auto; touch-action:none; }
+  .joystick-base { position:absolute; left:50%; top:50%; width:104px; height:104px; margin:-52px 0 0 -52px; border-radius:50%; background:rgba(8,12,20,.5); border:2px solid rgba(255,255,255,.22); box-shadow:inset 0 0 18px rgba(0,0,0,.35); }
+  .joystick-knob { position:absolute; left:50%; top:50%; width:48px; height:48px; margin:-24px 0 0 -24px; border-radius:50%; background:rgba(255,255,255,.28); border:1px solid rgba(255,255,255,.4); box-shadow:0 4px 10px rgba(0,0,0,.3); transition:background .1s ease; }
+  #touch-joystick.active .joystick-knob { background:rgba(145,236,93,.55); border-color:rgba(145,236,93,.75); }
+
+  /* Minecraft-style round icon action buttons */
+  .touch-actions { position:absolute; right:14px; bottom:22px; display:flex; align-items:flex-end; gap:12px; pointer-events:none; }
+  .action-btn { position:relative; flex:0 0 auto; width:56px; height:56px; padding:0; display:grid; place-items:center; border-radius:50%; color:#fff; background:rgba(8,12,20,.6); border:2px solid rgba(255,255,255,.24); pointer-events:auto; box-shadow:0 6px 14px rgba(0,0,0,.32); }
+  .action-btn:active { background:rgba(255,255,255,.18); transform:translateY(1px); }
+  .action-icon { font-size:22px; line-height:1; filter:drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
+  .mine-btn { border-color:rgba(255,216,107,.55); }
+  .attack-btn { background:rgba(255,105,105,.18); border-color:rgba(255,105,105,.55); }
+  .place-btn { border-color:rgba(102,185,255,.55); }
+  .jump-btn { width:76px; height:76px; background:rgba(145,236,93,.2); border-color:rgba(145,236,93,.65); }
+  .jump-btn .action-icon { font-size:30px; font-weight:900; }
   .quest-card { top:64px; width:220px; }
   .world-card { display:none; }
   .topbar { top:8px; left:8px; right:8px; }
@@ -207,4 +224,43 @@ kbd { color:var(--text); font-size:10px; font-weight:900; }
   #underwater-overlay::after {
     animation: none;
   }
+}
+
+/* Rotate-to-landscape prompt — only for the installed mobile app, only in portrait */
+#rotate-overlay { display:none; }
+html.mc-installed-app #rotate-overlay {
+  display: none;
+}
+@media (pointer:coarse) and (orientation:portrait) {
+  html.mc-installed-app #rotate-overlay {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    background: #0b0f16;
+    color: #fff;
+    text-align: center;
+  }
+  html.mc-installed-app #rotate-overlay .rotate-icon {
+    font-size: 60px;
+    animation: rotate-hint 1.6s ease-in-out infinite;
+  }
+  html.mc-installed-app #rotate-overlay p {
+    margin: 0;
+    max-width: 260px;
+    font-size: 14px;
+    color: rgba(255,255,255,.82);
+  }
+}
+@keyframes rotate-hint {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.mc-installed-app #rotate-overlay .rotate-icon { animation: none; }
 }

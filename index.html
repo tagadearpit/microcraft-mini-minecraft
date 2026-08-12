@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#101820" />
-  <meta name="microcraft-build" content="realistic-v6" />
+  <meta name="microcraft-build" content="mobile-controls-v7" />
   <meta name="description" content="MicroCraft — a compact browser voxel survival sandbox with mining, building, crafting, enemies, challenges, and day/night gameplay." />
   <meta property="og:title" content="MicroCraft Showcase" />
   <meta property="og:description" content="Mine, build, craft, survive the night, and complete challenges in a compact browser voxel world." />
@@ -68,20 +68,24 @@
     <div id="hotbar" aria-label="Block hotbar"></div>
 
     <div id="touch-controls" aria-hidden="true">
-      <div class="touch-move">
-        <button data-key="KeyW" aria-label="Move forward">▲</button>
-        <button data-key="KeyA" aria-label="Move left">◀</button>
-        <button data-key="KeyS" aria-label="Move backward">▼</button>
-        <button data-key="KeyD" aria-label="Move right">▶</button>
+      <div id="touch-joystick" class="touch-move" aria-label="Movement joystick">
+        <div id="joystick-base" class="joystick-base">
+          <div id="joystick-knob" class="joystick-knob"></div>
+        </div>
       </div>
       <div id="touch-look" aria-label="Swipe to look"></div>
       <div class="touch-actions">
-        <button id="touch-jump" aria-label="Jump">JUMP</button>
-        <button id="touch-mine" aria-label="Mine">MINE</button>
-        <button id="touch-place" aria-label="Place block">PLACE</button>
-        <button id="touch-attack" aria-label="Attack">HIT</button>
+        <button id="touch-place" class="action-btn place-btn" aria-label="Place block"><span class="action-icon">🧱</span></button>
+        <button id="touch-mine" class="action-btn mine-btn" aria-label="Mine"><span class="action-icon">⛏️</span></button>
+        <button id="touch-attack" class="action-btn attack-btn" aria-label="Attack"><span class="action-icon">⚔️</span></button>
+        <button id="touch-jump" class="action-btn jump-btn" aria-label="Jump"><span class="action-icon">⬆</span></button>
       </div>
     </div>
+  </div>
+
+  <div id="rotate-overlay" aria-hidden="true">
+    <div class="rotate-icon">📱</div>
+    <p>Rotate your device to landscape to play MicroCraft</p>
   </div>
 
   <section id="menu" class="overlay visible">
@@ -109,6 +113,15 @@
         <div><kbd>P</kbd><span>Save screenshot</span></div>
       </div>
 
+      <div id="mobile-settings" class="mobile-settings">
+        <div class="eyebrow">TOUCH CONTROLS</div>
+        <div class="sensitivity-row">
+          <span>Look sensitivity</span>
+          <input type="range" id="sensitivity-slider" min="1" max="10" step="1" value="5" aria-label="Touch look sensitivity" />
+          <span id="sensitivity-value">5</span>
+        </div>
+      </div>
+
       <div class="menu-actions three">
         <button id="craft-button" class="secondary">Crafting</button>
         <button id="save-button" class="secondary">Save world</button>
@@ -121,7 +134,7 @@
       </div>
 
       <p id="world-info" class="world-info">Loading world…</p>
-      <p class="footnote">Desktop: click Enter World for pointer lock. Mobile: drag the right side to look and use the touch controls.</p>
+      <p class="footnote">Desktop: click Enter World for pointer lock. Mobile: use the left joystick to move, drag the right side to look, and tap the icon buttons to mine, attack, place, and jump.</p>
     </div>
   </section>
 

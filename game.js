@@ -16,6 +16,145 @@ globalThis.__MICROCRAFT_THREE__ = THREE;
 globalThis.__MICROCRAFT_PLC__ = PointerLockControls;
 
 // ---------------------------------------------------------------------------
+// Mobile-only enhancements
+// ---------------------------------------------------------------------------
+// Everything in this block is gated behind `pointer: coarse` (touch devices)
+// and, for the orientation lock / rotate prompt, behind "installed app"
+// detection. None of it runs, renders, or attaches listeners on desktop —
+// laptop/mouse users get the exact same experience as before.
+// It talks to the patched engine (below) only through two tiny bridge
+// globals (window.__mcJoystickVector / window.__mcLookSensitivity) so it
+// never has to touch the remote engine source directly.
+(function mobileEnhancements() {
+  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+
+  function isInstalledApp() {
+    return window.matchMedia('(display-mode: standalone)').matches
+      || window.matchMedia('(display-mode: fullscreen)').matches
+      || window.matchMedia('(display-mode: minimal-ui)').matches
+      || window.navigator.standalone === true;
+  }
+
+  if (isTouchDevice) document.documentElement.classList.add('mc-touch');
+
+  // --- Auto landscape ("tilt") for the installed app only -----------------
+  async function lockLandscape() {
+    if (!isTouchDevice || !isInstalledApp()) return;
+    try {
+      if (screen.orientation && typeof screen.orientation.lock === 'function') {
+        await screen.orientation.lock('landscape');
+      }
+    } catch (err) {
+      // Not supported (e.g. iOS) or not allowed yet — the CSS rotate
+      // prompt below covers this case, so we just move on quietly.
+    }
+  }
+
+  function refreshInstalledAppState() {
+    if (isTouchDevice && isInstalledApp()) {
+      document.documentElement.classList.add('mc-installed-app');
+      lockLandscape();
+    }
+  }
+
+  refreshInstalledAppState();
+  window.addEventListener('load', refreshInstalledAppState);
+  document.addEventListener('fullscreenchange', lockLandscape);
+  document.addEventListener('DOMContentLoaded', () => {
+    const playBtn = document.querySelector('#play-button');
+    if (playBtn) playBtn.addEventListener('click', lockLandscape);
+  });
+
+  if (!isTouchDevice) return; // Nothing below this line ever runs on desktop.
+
+  // --- Look sensitivity (persisted) ---------------------------------------
+  const SENSITIVITY_KEY = 'microcraft-touch-sensitivity';
+  let storedSensitivity = Number(localStorage.getItem(SENSITIVITY_KEY));
+  if (!Number.isFinite(storedSensitivity) || storedSensitivity < 1 || storedSensitivity > 10) {
+    storedSensitivity = 5;
+  }
+  window.__mcLookSensitivity = storedSensitivity;
+
+  function wireSensitivitySlider() {
+    const slider = document.querySelector('#sensitivity-slider');
+    const label = document.querySelector('#sensitivity-value');
+    if (!slider) return;
+    slider.value = String(storedSensitivity);
+    if (label) label.textContent = String(storedSensitivity);
+    slider.addEventListener('input', () => {
+      const value = Number(slider.value);
+      window.__mcLookSensitivity = value;
+      if (label) label.textContent = String(value);
+      try { localStorage.setItem(SENSITIVITY_KEY, String(value)); } catch (err) {}
+    });
+  }
+
+  // --- Virtual movement joystick ------------------------------------------
+  window.__mcJoystickVector = { x: 0, y: 0 };
+
+  function wireJoystick() {
+    const zone = document.querySelector('#touch-joystick');
+    const knob = document.querySelector('#joystick-knob');
+    if (!zone || !knob) return;
+    const maxRadius = 42;
+    let activePointerId = null;
+    let originX = 0;
+    let originY = 0;
+
+    function setKnob(dx, dy) {
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    }
+    function reset() {
+      activePointerId = null;
+      window.__mcJoystickVector.x = 0;
+      window.__mcJoystickVector.y = 0;
+      setKnob(0, 0);
+      zone.classList.remove('active');
+    }
+    zone.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      activePointerId = event.pointerId;
+      const rect = zone.getBoundingClientRect();
+      originX = rect.left + rect.width / 2;
+      originY = rect.top + rect.height / 2;
+      zone.classList.add('active');
+      zone.setPointerCapture(event.pointerId);
+    });
+    zone.addEventListener('pointermove', (event) => {
+      if (event.pointerId !== activePointerId) return;
+      event.preventDefault();
+      let dx = event.clientX - originX;
+      let dy = event.clientY - originY;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxRadius) {
+        dx = (dx / dist) * maxRadius;
+        dy = (dy / dist) * maxRadius;
+      }
+      setKnob(dx, dy);
+      window.__mcJoystickVector.x = dx / maxRadius;
+      window.__mcJoystickVector.y = -dy / maxRadius; // up = forward
+    });
+    const end = (event) => {
+      if (event.pointerId !== activePointerId) return;
+      reset();
+    };
+    zone.addEventListener('pointerup', end);
+    zone.addEventListener('pointercancel', end);
+    zone.addEventListener('pointerleave', end);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      wireSensitivitySlider();
+      wireJoystick();
+    });
+  } else {
+    wireSensitivitySlider();
+    wireJoystick();
+  }
+})();
+
+// ---------------------------------------------------------------------------
 // Feature patches
 // ---------------------------------------------------------------------------
 function applyPatches(source) {
@@ -387,6 +526,18 @@ ensureUnderwaterOverlay();`
     checkChallenges();
   }
 }`
+  );
+
+  // --- Mobile joystick blends into WASD movement ---
+  code = code.replace(
+    "  const forwardInput = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);\n  const rightInput = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);",
+    "  const joyVec = window.__mcJoystickVector || { x: 0, y: 0 };\n  const forwardInput = clamp((keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0) + joyVec.y, -1, 1);\n  const rightInput = clamp((keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0) + joyVec.x, -1, 1);"
+  );
+
+  // --- Touch-look sensitivity setting ---
+  code = code.replace(
+    "  camera.rotation.y -= dx * 0.0045;\n  camera.rotation.x = clamp(camera.rotation.x - dy * 0.0045, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);",
+    "  const lookScale = (window.__mcLookSensitivity || 5) / 5;\n  camera.rotation.y -= dx * 0.0045 * lookScale;\n  camera.rotation.x = clamp(camera.rotation.x - dy * 0.0045 * lookScale, -Math.PI / 2 + 0.05, Math.PI / 2 - 0.05);"
   );
 
   // Longer reach when holding a sword
