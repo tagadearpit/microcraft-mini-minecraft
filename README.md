@@ -43,6 +43,14 @@ The game engine no longer downloads a separate MicroCraft engine file at runtime
 
 - Left thumb: analog joystick to move
 - Right side: drag to look (sensitivity adjustable in the menu)
-- Bottom-right icon buttons: place, mine, attack, jump
+- Bottom-right icon buttons: place, mine, attack, jump (no longer overlap the hotbar)
 - When installed to the home screen from Chrome, the app automatically locks to landscape orientation. In a regular browser tab it behaves as before.
+
+### Desktop
+
+- Hold left click to mine blocks, or to attack a targeted mob (F still works too)
+- Right click still places blocks
+- Press `G` to open the pause/settings menu at any time during play
+- Swords now render as an actual sword silhouette (blade/guard/handle) in the hotbar and in hand, instead of a plain colored square
+- Quality mode now has a bigger visible difference: High pushes resolution and shadow detail up further; Performance trims both harder for a bigger FPS gain on weaker hardware
 - `P` — screenshot

@@ -549,7 +549,7 @@ ensureUnderwaterOverlay();`
   // Hint text shows weapon
   code = code.replace(
     "  if (currentMobTarget) interactionHint.textContent = `F · Attack slime (${currentMobTarget.hp} HP)`;",
-    "  if (currentMobTarget) interactionHint.textContent = `F · Attack with ${getActiveWeapon().label} (${currentMobTarget.hp} HP)`;\n  else if (getSelectedDef()?.isConsumable) interactionHint.textContent = 'F · Eat apple (+2 health)';\n  else if (getSelectedDef()?.isWeapon) interactionHint.textContent = `${getActiveWeapon().label} ready · F to attack`;"
+    "  if (currentMobTarget) interactionHint.textContent = `Click / F · Attack with ${getActiveWeapon().label} (${currentMobTarget.hp} HP)`;\n  else if (getSelectedDef()?.isConsumable) interactionHint.textContent = 'F · Eat apple (+2 health)';\n  else if (getSelectedDef()?.isWeapon) interactionHint.textContent = `${getActiveWeapon().label} ready · click or F to attack`;"
   );
 
   // Do not place weapons / food as blocks
@@ -563,7 +563,7 @@ ensureUnderwaterOverlay();`
   const type = hotbarTypes[selectedIndex];
   const def = blockTypes[type];
   if (def?.isConsumable) { tryConsumeApple(); return; }
-  if (def?.isWeapon) { showToast(def.label + ' equipped · press F to attack'); return; }
+  if (def?.isWeapon) { showToast(def.label + ' equipped · left-click or F to attack'); return; }
   if (!currentTarget) return;
   if ((inventory[type] ?? 0) <= 0) {`
   );
@@ -633,6 +633,67 @@ ensureUnderwaterOverlay();`
   code = code.replace(
     'function damagePlayer(amount, reason = \'damage\') {\n  if (isDead) return;\n  playerState.health = clamp(playerState.health - amount, 0, MAX_HEALTH);',
     "function damagePlayer(amount, reason = 'damage') {\n  if (isDead) return;\n  combatTimer = 6;\n  killStreak = 0;\n  playerState.health = clamp(playerState.health - amount, 0, MAX_HEALTH);"
+  );
+
+  // --- Real Minecraft-style sword shape (hotbar swatch + held item) ---
+  code = code.replace(
+    '    slot.innerHTML = `<span class="slot-number">${index + 1}</span><span class="block-swatch" style="background:${definition.color}"></span><span class="slot-count">${count}</span>`;',
+    "    const isSword = Boolean(definition.isWeapon);\n    const swatchClass = isSword ? 'block-swatch sword-icon' : 'block-swatch';\n    const swatchStyle = isSword ? `--blade-color:${definition.color}` : `background:${definition.color}`;\n    slot.innerHTML = `<span class=\"slot-number\">${index + 1}</span><span class=\"${swatchClass}\" style=\"${swatchStyle}\"></span><span class=\"slot-count\">${count}</span>`;"
+  );
+  code = code.replace(
+    '  heldBlock.style.background = blockTypes[selectedType].color;',
+    "  const heldDef = blockTypes[selectedType];\n  heldBlock.classList.toggle('sword-icon', Boolean(heldDef.isWeapon));\n  if (heldDef.isWeapon) {\n    heldBlock.style.background = '';\n    heldBlock.style.setProperty('--blade-color', heldDef.color);\n  } else {\n    heldBlock.style.removeProperty('--blade-color');\n    heldBlock.style.background = heldDef.color;\n  }"
+  );
+
+  // --- Desktop: left click also attacks when aiming at a mob (in addition
+  //     to mining blocks, which it already did). Right click still places. ---
+  code = code.replace(
+    '  if (!gameActive() || !leftMouseDown || !currentTarget || miningCooldown > 0) {\n    if (!leftMouseDown || !currentTarget || !gameActive()) resetMining();\n    return;\n  }',
+    "  if (gameActive() && leftMouseDown && currentMobTarget) {\n    attackMob();\n    resetMining();\n    return;\n  }\n  if (!gameActive() || !leftMouseDown || !currentTarget || miningCooldown > 0) {\n    if (!leftMouseDown || !currentTarget || !gameActive()) resetMining();\n    return;\n  }"
+  );
+
+  // --- Fix: player occasionally ends up embedded in a block (after a rough
+  //     spawn placement or a tight squeeze near mobs/terrain) and can no
+  //     longer move. Every frame, if the player is found overlapping solid
+  //     terrain, gently nudge them out to the nearest free space. This is a
+  //     no-op (zero cost) in the normal case where nothing is overlapping. ---
+  code = code.replace(
+    'function updatePlayer(delta) {\n  if (!gameActive()) return;',
+    "function resolveStuckPlayer() {\n  if (!playerCollidesAt(camera.position)) return;\n  const nudge = 0.06;\n  const directions = [\n    [0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]\n  ];\n  for (let attempt = 0; attempt < 60; attempt += 1) {\n    if (!playerCollidesAt(camera.position)) return;\n    let escaped = false;\n    for (const [dx, dy, dz] of directions) {\n      const testPos = camera.position.clone();\n      testPos.x += dx * nudge;\n      testPos.y += dy * nudge;\n      testPos.z += dz * nudge;\n      if (!playerCollidesAt(testPos)) {\n        camera.position.copy(testPos);\n        escaped = true;\n        break;\n      }\n    }\n    if (!escaped) camera.position.y += nudge;\n  }\n}\n\nfunction updatePlayer(delta) {\n  if (!gameActive()) return;"
+  );
+  code = code.replace(
+    '  if (camera.position.y < -8) damagePlayer(MAX_HEALTH, \'falling out of the world\');\n  updateStaminaUI();\n}',
+    "  if (camera.position.y < -8) damagePlayer(MAX_HEALTH, 'falling out of the world');\n  resolveStuckPlayer();\n  updateStaminaUI();\n}"
+  );
+
+  // --- Quality mode: push High further up, Performance further down ---
+  code = code.replace(
+    "function applyQualitySettings() {\n  renderer.setPixelRatio(Math.min(window.devicePixelRatio, qualityHigh ? 1.75 : 1));\n  renderer.shadowMap.enabled = qualityHigh;\n  sun.castShadow = qualityHigh;\n  qualityButton.textContent = `Quality: ${qualityHigh ? 'High' : 'Performance'}`;\n  rebuildWorldMeshes();\n}",
+    "function applyQualitySettings() {\n  renderer.setPixelRatio(Math.min(window.devicePixelRatio, qualityHigh ? 2 : 0.75));\n  renderer.shadowMap.enabled = qualityHigh;\n  sun.castShadow = qualityHigh;\n  const shadowSize = qualityHigh ? 3072 : 1024;\n  if (sun.shadow.mapSize.width !== shadowSize) {\n    sun.shadow.mapSize.set(shadowSize, shadowSize);\n    if (sun.shadow.map) {\n      sun.shadow.map.dispose();\n      sun.shadow.map = null;\n    }\n  }\n  renderer.toneMappingExposure = qualityHigh ? 1.08 : 0.98;\n  if (scene.fog) {\n    scene.fog.near = qualityHigh ? 30 : 16;\n    scene.fog.far = qualityHigh ? 85 : 40;\n  }\n  qualityButton.textContent = `Quality: ${qualityHigh ? 'High' : 'Performance'}`;\n  rebuildWorldMeshes();\n}"
+  );
+
+  // Richer particles in High quality, leaner particles in Performance
+  code = code.replace(
+    '  const count = qualityHigh ? (options.count ?? 12) : Math.ceil((options.count ?? 12) * 0.55);',
+    '  const count = qualityHigh ? Math.ceil((options.count ?? 12) * 1.25) : Math.ceil((options.count ?? 12) * 0.35);'
+  );
+
+  // More mobs roaming in High quality, fewer in Performance (less update cost)
+  code = code.replace(
+    '  if (mobs.length >= (qualityHigh ? 6 : 4)) return;',
+    '  if (mobs.length >= (qualityHigh ? 8 : 3)) return;'
+  );
+
+  // --- "G" opens the pause/settings menu, same as the on-screen pause
+  //     button. Also releases desktop pointer lock so the menu is
+  //     actually clickable (a locked pointer has no visible cursor). ---
+  code = code.replace(
+    "pauseButton.addEventListener('click', () => {\n  touchActive = false;\n  keys.clear();\n  leftMouseDown = false;\n  resetMining();\n  menu.classList.add('visible');\n  hud.classList.add('hidden');\n  hud.setAttribute('aria-hidden', 'true');\n  saveWorld(false);\n});",
+    "function openPauseMenu() {\n  if (controls.isLocked) controls.unlock();\n  touchActive = false;\n  keys.clear();\n  leftMouseDown = false;\n  resetMining();\n  menu.classList.add('visible');\n  hud.classList.add('hidden');\n  hud.setAttribute('aria-hidden', 'true');\n  saveWorld(false);\n}\npauseButton.addEventListener('click', openPauseMenu);"
+  );
+  code = code.replace(
+    "  if (event.code === 'KeyP' && !event.repeat) takeScreenshot();\n});",
+    "  if (event.code === 'KeyP' && !event.repeat) takeScreenshot();\n  if (event.code === 'KeyG' && !event.repeat && gameActive()) openPauseMenu();\n});"
   );
 
   return code;

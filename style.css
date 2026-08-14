@@ -87,6 +87,41 @@ button { cursor: pointer; }
 @keyframes hand-place { 0%{transform:rotate(-10deg) scale(1)} 48%{transform:rotate(8deg) translate(-24px,-16px) scale(.92)} 100%{transform:rotate(-10deg) scale(1)} }
 @keyframes hand-hit { 0%{transform:rotate(-10deg)} 45%{transform:rotate(-64deg) translate(-58px,-28px) scale(.94)} 100%{transform:rotate(-10deg)} }
 
+/* Real-Minecraft-style diagonal sword silhouette — used for the hotbar swatch
+   and the held item in place of a plain colored square. --blade-color is set
+   inline per sword (wood/stone) so the same shape works for both. */
+.sword-icon {
+  position: relative;
+  border: none !important;
+  border-radius: 3px;
+  background: linear-gradient(
+    to bottom,
+    var(--blade-color, #d7dee5) 0%,
+    var(--blade-color, #d7dee5) 52%,
+    #b98a4e 52%,
+    #b98a4e 60%,
+    #4a2f16 60%,
+    #4a2f16 63%,
+    #6b4726 63%,
+    #6b4726 100%
+  );
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.45), 0 3px 6px rgba(0,0,0,.3);
+}
+.block-swatch.sword-icon { transform: rotate(45deg); }
+#held-block.sword-icon { border: none; background-color: transparent; transform: rotate(53deg); box-shadow: inset 0 0 0 1px rgba(0,0,0,.45), 0 8px 16px rgba(0,0,0,.28); }
+.sword-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 49%;
+  width: 170%;
+  height: 13%;
+  margin-left: -85%;
+  background: #b98a4e;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.4);
+}
+
 .overlay { position:fixed; inset:0; z-index:10; display:grid; place-items:center; padding:22px; background:radial-gradient(circle at 50% 22%,rgba(65,143,255,.23),transparent 34%),rgba(3,7,13,.7); backdrop-filter:blur(9px); opacity:0; pointer-events:none; transition:opacity .22s ease; }
 .panel { position:relative; width:min(720px,100%); max-height:calc(100vh - 30px); overflow:auto; padding:clamp(24px,4vw,40px); border:1px solid var(--line); border-radius:24px; background:var(--panel); box-shadow:0 28px 90px rgba(0,0,0,.48); }
 .eyebrow { color:var(--accent); font-size:10px; font-weight:950; letter-spacing:.17em; }
@@ -147,24 +182,29 @@ kbd { color:var(--text); font-size:10px; font-weight:900; }
   #touch-joystick.active .joystick-knob { background:rgba(145,236,93,.55); border-color:rgba(145,236,93,.75); }
 
   /* Minecraft-style round icon action buttons */
-  .touch-actions { position:absolute; right:14px; bottom:22px; display:flex; align-items:flex-end; gap:12px; pointer-events:none; }
-  .action-btn { position:relative; flex:0 0 auto; width:56px; height:56px; padding:0; display:grid; place-items:center; border-radius:50%; color:#fff; background:rgba(8,12,20,.6); border:2px solid rgba(255,255,255,.24); pointer-events:auto; box-shadow:0 6px 14px rgba(0,0,0,.32); }
+  .touch-actions { position:absolute; right:12px; bottom:20px; display:flex; align-items:flex-end; gap:8px; pointer-events:none; }
+  .action-btn { position:relative; flex:0 0 auto; width:50px; height:50px; padding:0; display:grid; place-items:center; border-radius:50%; color:#fff; background:rgba(8,12,20,.6); border:2px solid rgba(255,255,255,.24); pointer-events:auto; box-shadow:0 6px 14px rgba(0,0,0,.32); }
   .action-btn:active { background:rgba(255,255,255,.18); transform:translateY(1px); }
-  .action-icon { font-size:22px; line-height:1; filter:drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
+  .action-icon { font-size:20px; line-height:1; filter:drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
   .mine-btn { border-color:rgba(255,216,107,.55); }
   .attack-btn { background:rgba(255,105,105,.18); border-color:rgba(255,105,105,.55); }
   .place-btn { border-color:rgba(102,185,255,.55); }
-  .jump-btn { width:76px; height:76px; background:rgba(145,236,93,.2); border-color:rgba(145,236,93,.65); }
-  .jump-btn .action-icon { font-size:30px; font-weight:900; }
+  .jump-btn { width:66px; height:66px; background:rgba(145,236,93,.2); border-color:rgba(145,236,93,.65); }
+  .jump-btn .action-icon { font-size:26px; font-weight:900; }
   .quest-card { top:64px; width:220px; }
   .world-card { display:none; }
   .topbar { top:8px; left:8px; right:8px; }
   #stats { font-size:9px; }
-  #hotbar { bottom:18px; max-width:calc(100vw - 180px); overflow-x:auto; scrollbar-width:none; }
+  /* Hotbar sits between the joystick (left) and the action buttons (right) —
+     positioned by both edges instead of centered, so it can never overlap
+     either control regardless of screen width. */
+  #hotbar { bottom:18px; left:168px; right:270px; transform:none; max-width:none; width:auto; justify-content:flex-start; overflow-x:auto; scrollbar-width:none; }
   .hotbar-slot { flex:0 0 auto; width:42px; height:42px; }
   .block-swatch { width:22px; height:22px; }
-  .survival-panel { bottom:74px; }
-  #player-hand { right:4px; bottom:2px; transform:scale(.68) rotate(-10deg); transform-origin:100% 100%; }
+  .survival-panel { bottom:96px; width:min(260px, calc(100vw - 460px)); }
+  /* The decorative first-person hand sits in the same corner as the action
+     buttons on small screens — hide it there to avoid overlap/clutter. */
+  #player-hand { display:none; }
 }
 
 @media (max-width:620px) {
