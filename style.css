@@ -87,40 +87,34 @@ button { cursor: pointer; }
 @keyframes hand-place { 0%{transform:rotate(-10deg) scale(1)} 48%{transform:rotate(8deg) translate(-24px,-16px) scale(.92)} 100%{transform:rotate(-10deg) scale(1)} }
 @keyframes hand-hit { 0%{transform:rotate(-10deg)} 45%{transform:rotate(-64deg) translate(-58px,-28px) scale(.94)} 100%{transform:rotate(-10deg)} }
 
-/* Real-Minecraft-style diagonal sword silhouette — used for the hotbar swatch
-   and the held item in place of a plain colored square. --blade-color is set
-   inline per sword (wood/stone) so the same shape works for both. */
+/* Pixel-art Minecraft sword — the .sword-icon element is now just a
+   transparent box; the sword itself is an inline SVG (16x16 <rect> grid)
+   injected by game.js (window.__mcSwordSVG). Blade pixels use
+   fill="currentColor", so the element's `color` property — kept in sync
+   with --blade-color by the game.js hotbar/held-item patches — tints the
+   blade (wood vs stone) while outline/guard/grip/pommel keep fixed pixel
+   colors. crispEdges keeps the pixel grid hard-edged at both sizes. */
 .sword-icon {
   position: relative;
   border: none !important;
-  border-radius: 3px;
-  background: linear-gradient(
-    to bottom,
-    var(--blade-color, #d7dee5) 0%,
-    var(--blade-color, #d7dee5) 52%,
-    #b98a4e 52%,
-    #b98a4e 60%,
-    #4a2f16 60%,
-    #4a2f16 63%,
-    #6b4726 63%,
-    #6b4726 100%
-  );
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.45), 0 3px 6px rgba(0,0,0,.3);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  clip-path: none;
+  filter: drop-shadow(1px 2px 0 rgba(0, 0, 0, 0.35));
 }
-.block-swatch.sword-icon { transform: rotate(45deg); }
-#held-block.sword-icon { border: none; background-color: transparent; transform: rotate(53deg); box-shadow: inset 0 0 0 1px rgba(0,0,0,.45), 0 8px 16px rgba(0,0,0,.28); }
-.sword-icon::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 49%;
-  width: 170%;
-  height: 13%;
-  margin-left: -85%;
-  background: #b98a4e;
-  border-radius: 2px;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.4);
+.sword-icon::before,
+.sword-icon::after { content: none; }
+.sword-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  shape-rendering: crispEdges;
 }
+/* The SVG already draws the sword diagonally (tip top-right), matching the
+   reference image — no rotation needed at either size. */
+.block-swatch.sword-icon { transform: none; }
+#held-block.sword-icon { border: none; background-color: transparent; transform: none; box-shadow: none; }
 
 .overlay { position:fixed; inset:0; z-index:10; display:grid; place-items:center; padding:22px; background:radial-gradient(circle at 50% 22%,rgba(65,143,255,.23),transparent 34%),rgba(3,7,13,.7); backdrop-filter:blur(9px); opacity:0; pointer-events:none; transition:opacity .22s ease; }
 .panel { position:relative; width:min(720px,100%); max-height:calc(100vh - 30px); overflow:auto; padding:clamp(24px,4vw,40px); border:1px solid var(--line); border-radius:24px; background:var(--panel); box-shadow:0 28px 90px rgba(0,0,0,.48); }
