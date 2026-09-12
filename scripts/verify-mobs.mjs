@@ -8,126 +8,94 @@
  *   1. Loads ../game.js (the loader + patch layer) and ./core-source.js
  *      (a verbatim copy of the pinned remote engine, commit e8f770a4 — the
  *      same bytes CORE_URL fetches at runtime; sha256 printed at the end so
- *      you can compare against a fresh CDN download).
- *   2. Extracts applyPatches(source) from game.js and runs it against core.
- *   3. Asserts that the patched source contains:
- *        - all three zombie variants in MOB_TYPES (regular, fast, tank) with
- *          distinct stats
- *        - night-only spawning logic for aggressive mobs
- *        - daylight burning mechanic
- *        - createZombieModel() with the classic multi-part hierarchy
- *        - limb swing animation in the update loop
- *        - custom audio tones for zombie hits
- *        - zombie loot drops (dirt, stone, chance of apple)
- *        - mobile touch controls untouched (joystick, look zone, tilt lock)
- *        - desktop click-to-attack / F hotkey preserved
- *   4. Writes the patched source out to ./patched-engine.js so you can inspect
- *      the exact code the browser will run.
+ *      you can compare against a fresh CDN download if you want).
+ *   2. Executes the loader's real applyPatches() against the core source and
+ *      asserts every sword/mob/terrain patch actually matched (no silent
+ *      no-op string replacements).
+ *   3. Writes the resulting patched engine to ./patched-engine.js so that
+ *      verify-mobs-runtime.mjs (and you) can inspect/execute it.
  */
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const root = path.resolve(__dirname, '..');
-
-const loaderPath = path.join(root, 'game.js');
-const corePath = path.join(__dirname, 'core-source.js');
-const outPath = path.join(__dirname, 'patched-engine.js');
-
-if (!fs.existsSync(loaderPath)) {
-  console.error('game.js not found at ' + loaderPath);
-  process.exit(1);
-}
-if (!fs.existsSync(corePath)) {
-  console.error(
-    'core-source.js not found at ' + corePath +
-    '\nRun `curl -sL https://cdn.jsdelivr.net/gh/tagadearpit/microcraft-mini-minecraft@e8f770a4cd2a1cb806dcd131c5853f387f775877/game.js > scripts/core-source.js` first.'
-  );
-  process.exit(1);
-}
+const here = path.dirname(fileURLToPath(import.meta.url));
+const loaderPath = path.join(here, '..', 'game.js');
+const corePath = path.join(here, 'core-source.js');
+const outPath = path.join(here, 'patched-engine.js');
 
 const loader = fs.readFileSync(loaderPath, 'utf8');
 const core = fs.readFileSync(corePath, 'utf8');
 
-// Extract the applyPatches function body from game.js
-const fnMatch = loader.match(/function applyPatches\(source\) \{([\s\S]*?)\n\}\s*\n\s*\/\/\s*Run the patched engine/);
-if (!fnMatch) {
-  console.error('Failed to extract applyPatches() from game.js');
+// Sanity: this copy must be the pinned commit's engine (spot-check markers).
+if (!core.includes('const WORLD_RADIUS = 18;') || !core.includes('function spawnSlime()')) {
+  console.error('core-source.js does not look like the pinned engine (missing WORLD_RADIUS/spawnSlime markers).');
   process.exit(1);
 }
 
-// Evaluate applyPatches in a tiny sandbox that mirrors the loader environment
-const applyPatches = new Function('source', fnMatch[1]);
+// ---- Execute the loader's applyPatches() with browser globals stubbed ----
+let mod = loader
+  .replace(/import \* as THREE from 'three';\n/, '')
+  .replace(/import \{ PointerLockControls \} from 'three\/addons\/controls\/PointerLockControls\.js';\n/, '')
+  .replace(/^boot\(\);\s*$/m, '');
+globalThis.window = { matchMedia: () => ({ matches: false }), addEventListener: () => {}, __mcLookSensitivity: 5 };
+globalThis.document = { documentElement: { classList: { add: () => {} } }, addEventListener: () => {}, querySelector: () => null, readyState: 'complete' };
+globalThis.localStorage = { getItem: () => null, setItem: () => {} };
+globalThis.screen = {};
+const applyPatches = new Function(
+  'const THREE = {}; const PointerLockControls = function(){};\n' + mod + '\nreturn applyPatches;'
+)();
+const patched = applyPatches(core);
 
-let patched;
-try {
-  patched = applyPatches(core);
-} catch (err) {
-  console.error('applyPatches threw an error:');
-  console.error(err);
-  process.exit(1);
-}
+const styleCss = fs.readFileSync(path.join(here, '..', 'style.css'), 'utf8');
 
-// --- Marker assertions ------------------------------------------------------
 const checks = [
-  // Mob definitions
-  ['MOB_TYPES constant defined', patched.includes('const MOB_TYPES = Object.freeze({')],
-  ['slime in MOB_TYPES', patched.includes("type: 'slime'")],
-  ['zombie in MOB_TYPES', patched.includes("type: 'zombie'")],
-  ['fast_zombie in MOB_TYPES', patched.includes("type: 'fast_zombie'")],
-  ['tank_zombie in MOB_TYPES', patched.includes("type: 'tank_zombie'")],
-
-  // Distinct stats across variants
-  ['regular zombie stats (hp: 6, speed: 2.1, dmg: 2)',
-    patched.includes("hp: 6,") && patched.includes("speed: 2.1,") && patched.includes("damage: 2,")],
-  ['fast zombie stats (hp: 4, speed: 3.3, dmg: 1.5)',
-    patched.includes("hp: 4,") && patched.includes("speed: 3.3,") && patched.includes("damage: 1.5,")],
-  ['tank zombie stats (hp: 12, speed: 1.5, dmg: 3.5)',
-    patched.includes("hp: 12,") && patched.includes("speed: 1.5,") && patched.includes("damage: 3.5,")],
-
-  // Model creation
-  ['createZombieModel function present', patched.includes('function createZombieModel(')],
-  ['zombie head mesh present', patched.includes('zombieHeadGeo')],
-  ['zombie arms present (classic forward reach)', patched.includes('leftArm.rotation.x = -Math.PI / 2')],
-  ['zombie legs present', patched.includes('leftLeg') && patched.includes('rightLeg')],
-  ['green zombie skin color', patched.includes('0x4b7337') || patched.includes('0x3f632d') || patched.includes('0x345025')],
-  ['blue pants color', patched.includes('0x2b386b') || patched.includes('0x222e57')],
-  ['cyan shirt color', patched.includes('0x2e7d7d') || patched.includes('0x236363')],
-
-  // Spawner & daytime rules
-  ['night-only zombie spawn gating', patched.includes('daylight < 0.35')],
-  ['weighted variant picker (chooseMobType)', patched.includes('function chooseMobType()')],
-  ['zombie burn timer tracking', patched.includes('burnTimer: 0')],
-  ['daylight burning loop', patched.includes('mob.burnTimer') && patched.includes('mob.hp -= 1')],
-  ['fire particles while burning', patched.includes("spawnParticles(pos.x, pos.y + 0.9, pos.z, 'dirt'")],
-
-  // Animation
-  ['walking limb animation loop', patched.includes('mob.limbAngle') && patched.includes('leftArm.rotation.x')],
-
-  // Audio & feedback
-  ['distinct zombie groan / hit pitch', patched.includes('playTone(85, 0.12, 0.045, ') || patched.includes('playTone(110, 0.09, 0.04, ')],
-  ['player damage flash (red emissive)', patched.includes('mob.hitTimer = 0.14')],
-
-  // Combat integration
-  ['zombies attack player in reach', patched.includes('dist < 1.25') && patched.includes('damagePlayer(mob.damage')],
-  ['weapon reach hits zombies', patched.includes('currentMobTarget = null')],
-  ['kill rewards track kills and score', patched.includes('gameStats.kills += 1') && patched.includes('playerState.score += mob.score')],
-
-  // Loot drops
-  ['loot drops on death', patched.includes('inventory.dirt += 1') && patched.includes('inventory.apple += 1')],
-
-  // Existing features untouched
-  ['water physics preserved', patched.includes('isUnderwater') && patched.includes('spawnSplash')],
-  ['underwater caustics/fog preserved', patched.includes('updateUnderwaterFog')],
-  ['weapons crafting preserved', patched.includes('wood_sword') && patched.includes('stone_sword')],
-  ['food healing preserved', patched.includes('tryConsumeApple')],
-  ['mobile touch joystick preserved', loader.includes('window.__mcJoystickVector')],
-  ['mobile look sensitivity preserved', loader.includes('window.__mcLookSensitivity')],
-  ['tilt lock preserved', loader.includes('screen.orientation.lock')]
+  // --- sword icon (pixel-grid SVG) ---
+  ['sword SVG global defined', loader.includes('globalThis.__mcSwordSVG = MC_SWORD_PIXEL_ART')],
+  ['sword grid from reference (16 rows)', loader.includes("'.............XXX'") && loader.includes("'XXX.............'")],
+  ['hotbar injects __mcSwordSVG', loader.includes('window.__mcSwordSVG')],
+  ['held item injects __mcSwordSVG', loader.includes('heldBlock.innerHTML = window.__mcSwordSVG')],
+  ['held item clears innerHTML for non-swords', loader.includes("heldBlock.innerHTML = '';")],
+  // --- mob infrastructure (M0) ---
+  ['mob type table injected', patched.includes('const MC_MOB_TYPES = {')],
+  ['zombie def present', patched.includes("zombie:   { key: 'zombie'")],
+  ['skeleton def present', patched.includes("skeleton: { key: 'skeleton'")],
+  ['phantom def present', patched.includes("phantom:  { key: 'phantom'")],
+  ['phantom nightOnly', patched.includes('nightOnly: true,  flying: true')],
+  ['builders present', patched.includes('function mcBuildHumanoid') && patched.includes('function mcBuildPhantom')],
+  // --- M1 spawn ---
+  ['M1 spawn replaced (weighted pool)', patched.includes('const pool = [];') && patched.includes('spawnWeight; w += 1')],
+  ['M1 keeps 8:3 cap', patched.includes('if (mobs.length >= (qualityHigh ? 8 : 3)) return;\n  // Weighted type pick')],
+  ['M1 hp scaling uses type', patched.includes('type.baseHp + Math.min(type.hpCap')],
+  ['M1 body clone for hit-flash', patched.includes('body.material = body.material.clone();')],
+  ['M1 baseEmissive set', patched.includes("baseEmissive: type.key === 'slime'")],
+  // --- M2 removal ---
+  ['M2 removal uses hitMeshes', patched.includes('const meshes = mob.hitMeshes || [mob.body')],
+  ['M2 removal null-guarded', patched.includes('if (!mob || !mob.group) return;')],
+  // --- M3 updateMobs ---
+  ['M3 updateMobs replaced', patched.includes('const def = mob.def || MC_MOB_TYPES.slime;')],
+  ['M3 phantom flight', patched.includes('targetY = camera.position.y + 0.4') && patched.includes('never clip into terrain')],
+  ['M3 humanoid limb swing', patched.includes('mob.parts.legL.rotation.x = swing;')],
+  ['M3 wing flap', patched.includes('mob.parts.wingL.rotation.z = flap;')],
+  ['M3 per-type melee dmg', patched.includes("damagePlayer(def.dmg, 'a hostile ' + def.label.toLowerCase())")],
+  ['M3 phantom melee swing guard', patched.includes('if (mob.parts && mob.parts.armR) mob.parts.armR.rotation.x = -1.2;')],
+  ['M3 morning despawn preserved', patched.includes('if (currentNightFactor < 0.22 && mob.age > 20 && horizontalDistance > 8) removeSlime(mob);')],
+  ['original slime squash preserved in M3', patched.includes('mob.body.scale.set(1 / squash, squash, 1 / squash);')],
+  // --- M4/M5 text ---
+  ['M4 kill toast names mob type', patched.includes("(mob.def ? mob.def.label : 'Slime') + ' defeated · +' + bonus")],
+  ['M4 no leftover vanilla toast', !patched.includes("showToast('Slime defeated")],
+  ['M5 hint names mob type', patched.includes('Attack ${currentMobTarget.def ? currentMobTarget.def.label : ')],
+  ['M5 challenge renamed Mob Hunter', patched.includes("title: 'Mob Hunter', label: 'Defeat hostile mobs'")],
+  ['M5 Night Defender generic', patched.includes("title: 'Night Defender', label: 'Defeat mobs at night'")],
+  ['emissive reset uses baseEmissive (exactly once, crit line)', (patched.match(/mob\.baseEmissive \?\? 0x102b14/g) || []).length === 1],
+  ['no hardcoded green reset left in attackMob', !patched.includes('setHex(0x102b14), crit ? 140 : 90')],
+  // --- style.css sword rules ---
+  ['old gradient sword CSS gone from style.css', !styleCss.includes('clip-path: polygon(')],
+  ['crispEdges set', styleCss.includes('shape-rendering: crispEdges')],
+  ['sword rotations removed', !styleCss.includes('rotate(53deg)')],
+  // --- regressions: earlier feature patches still intact ---
+  ['prior chunk/terrain patches intact', patched.includes('const WORLD_RADIUS = 72;') && patched.includes('MCTerrain.generateChunkHeights')],
 ];
 
 let pass = 0;
